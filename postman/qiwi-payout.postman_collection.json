@@ -1,0 +1,288 @@
+{
+  "info": {
+    "name": "QIWI Payout — Локальные тесты",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Тесты против локального мок-сервера, эмулирующего QIWI Payout API по спецификации."
+  },
+  "item": [
+    {
+      "name": "1) Доступ сервиса: Получить все платежи",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments",
+          "host": ["{{baseUrl}}"],
+          "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Content-Type = JSON', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+              "const data = pm.response.json();",
+              "pm.test('Тело — массив', function () { pm.expect(Array.isArray(data)).to.be.true; });",
+              "if (data.length) {",
+              "  pm.test('PaymentInfo содержит обязательные поля', function () {",
+              "    pm.expect(data[0]).to.have.property('paymentId');",
+              "    pm.expect(data[0]).to.have.property('amount');",
+              "    pm.expect(data[0].amount).to.have.property('currency');",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2) Баланс > 0",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/balance",
+          "host": ["{{baseUrl}}"],
+          "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","balance"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "const b = pm.response.json();",
+              "pm.test('Поле available присутствует', function () { pm.expect(b).to.have.property('available'); });",
+              "const val = parseFloat(String(b.available.value).replace(',', '.'));",
+              "pm.test('available > 0', function () { pm.expect(val).to.be.above(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3) Создание платежа на 1 рубль",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments/{{paymentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments","{{paymentId}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"recipientDetails\": { \"providerCode\": \"qiwi-wallet\", \"fields\": { \"account\": \"79123456789\" } },\n  \"amount\": { \"value\": \"1.00\", \"currency\": \"RUB\" },\n  \"source\": { \"paymentType\": \"NO_EXTRA_CHARGE\", \"paymentToolType\": \"BANK_ACCOUNT\", \"paymentTerminalType\": \"INTERNET_BANKING\" }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "const p = pm.response.json();",
+              "pm.test('Статус READY', function () { pm.expect(p.status.value).to.eql('READY'); });",
+              "pm.test('Сумма 1 RUB', function () { pm.expect(p.amount.value).to.eql('1.00'); pm.expect(p.amount.currency).to.eql('RUB'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4) Исполнение платежа",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments/{{paymentId}}/execute",
+          "host": ["{{baseUrl}}"],
+          "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments","{{paymentId}}","execute"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "const p = pm.response.json();",
+              "pm.test('Статус COMPLETED', function () { pm.expect(p.status.value).to.eql('COMPLETED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Негативные сценарии",
+      "item": [
+        {
+          "name": "401 — без Authorization",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 401', function () { pm.response.to.have.status(401); });",
+                  "const e = pm.response.json();",
+                  "pm.test('errorCode = UNAUTHORIZED', function () { pm.expect(e.errorCode).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 — неверный формат Authorization",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "{{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 401', function () { pm.response.to.have.status(401); });",
+                  "const e = pm.response.json();",
+                  "pm.test('errorCode = UNAUTHORIZED', function () { pm.expect(e.errorCode).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "406 — без Accept",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 406', function () { pm.response.to.have.status(406); });",
+                  "const e = pm.response.json();",
+                  "pm.test('errorCode = NOT_ACCEPTABLE', function () { pm.expect(e.errorCode).to.eql('NOT_ACCEPTABLE'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "406 — Accept: application/xml",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/xml" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 406', function () { pm.response.to.have.status(406); });",
+                  "const e = pm.response.json();",
+                  "pm.test('errorCode = NOT_ACCEPTABLE', function () { pm.expect(e.errorCode).to.eql('NOT_ACCEPTABLE'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 — execute несуществующего paymentId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/partner/payout/v1/agents/{{agentId}}/points/{{pointId}}/payments/{{missingPaymentId}}/execute",
+              "host": ["{{baseUrl}}"],
+              "path": ["partner","payout","v1","agents","{{agentId}}","points","{{pointId}}","payments","{{missingPaymentId}}","execute"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статус 404', function () { pm.response.to.have.status(404); });",
+                  "const e = pm.response.json();",
+                  "pm.test('errorCode = PAYMENT_NOT_FOUND', function () { pm.expect(e.errorCode).to.eql('PAYMENT_NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "agentId", "value": "acme" },
+    { "key": "pointId", "value": "00001" },
+    { "key": "paymentId", "value": "pm-{{timestamp}}" },
+    { "key": "token", "value": "test-token" },
+    { "key": "missingPaymentId", "value": "missing-123" }
+  ]
+}

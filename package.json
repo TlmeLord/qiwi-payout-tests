@@ -1,0 +1,20 @@
+{
+  "name": "qiwi-payout-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Локальный мок + тесты Playwright + коллекция Postman для QIWI Payout API",
+  "scripts": {
+    "start:mock": "node src/mock-server.js",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "lint": "echo 'no lint'"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "cors": "2.8.5",
+    "morgan": "1.10.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.46.1"
+  }
+}
